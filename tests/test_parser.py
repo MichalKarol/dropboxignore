@@ -326,6 +326,3 @@ def test_exclude_basic():
     assert rules.excluded[0].match('test')
     assert rules.excluded[0].match('a/test')
     assert rules.excluded[0].match('a/test/more')
-
-# Tests for:
-# directory node_modules_old przy ignorowanym node_modules*/

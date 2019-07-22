@@ -35,6 +35,7 @@ import os
 import os.path as p
 import pyinotify
 import re
+import subprocess
 import sys
 
 
@@ -59,7 +60,10 @@ class Tree(defaultdict):
 
 
 class IgnoreTree(object):
-    tree: Tree = Tree()
+    def __init__(self, dropbox_path, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dropbox_path = dropbox_path
+        self.tree = Tree()
 
     def add_ignored(self, path):
         path_elements = path.split(p.sep)
@@ -72,6 +76,7 @@ class IgnoreTree(object):
                     return
             current_node = current_node[path_element]
         current_node.ignored = True
+        subprocess.call(f'dropbox exclude add {self.dropbox_path}{p.sep}{path}', shell=True)
 
 
 # Typedefing
@@ -81,7 +86,7 @@ Rules = NamedTuple('Rules', [('ignored', List[Pattern[str]]), ('excluded', List[
 def parse_dropboxignore(dropboxignore: List[str]) -> Rules:
     rules: Rules = Rules([], [])
 
-    # Otherwise, Git treats the pattern as a shell glob: "*" matches anything except "/", "?" matches any one 
+    # Otherwise, Git treats the pattern as a shell glob: "*" matches anything except "/", "?" matches any one
     # character except "/" and "[]" matches one character in a selected range.
     def prepare_regex(split: str) -> str:
         split = re.sub(r'([\.\+])', r'\\\1', split)  # Escape
@@ -106,7 +111,7 @@ def parse_dropboxignore(dropboxignore: List[str]) -> Rules:
             continue
 
         if line.startswith('\\#'):
-            line = '#' + line[2:]
+            line = f'#{line[2:]}'
 
         # Trailing spaces are ignored unless they are quoted with backslash ("\").
         line = re.sub(r'(\w[^\\])(\s+)', r'\1', line, flags=re.MULTILINE)
@@ -114,7 +119,7 @@ def parse_dropboxignore(dropboxignore: List[str]) -> Rules:
         # An optional prefix "!" which negates the pattern; any matching file excluded by a previous pattern will become
         # included again. It is not possible to re-include a file if a parent directory of that file is excluded. Git
         # doesn’t list excluded directories for performance reasons, so any patterns on contained files have no effect,
-        # no matter where they are defined. Put a backslash ("\") in front of the first "!" for patterns that begin with 
+        # no matter where they are defined. Put a backslash ("\") in front of the first "!" for patterns that begin with
         # a literal "!", for example, "\!important!.txt".
 
         if line.startswith('!'):
@@ -122,7 +127,7 @@ def parse_dropboxignore(dropboxignore: List[str]) -> Rules:
             exclude = True
 
         if line.startswith('\\!'):
-            line = '!' + line[2:]
+            line = f'!{line[2:]}'
 
         if line.startswith('**/'):
             line = line[3:]
@@ -142,7 +147,7 @@ def parse_dropboxignore(dropboxignore: List[str]) -> Rules:
         line = re.sub(r'\/\*\*\/', '**', line)
 
         if '/' in line and not line.endswith('/'):
-            # A leading slash matches the beginning of the pathname. For example, "/*.c" matches "cat-file.c" 
+            # A leading slash matches the beginning of the pathname. For example, "/*.c" matches "cat-file.c"
             # but not "mozilla-sha1/sha1.c".
             regex.append(r'^')
             regex.append(r'\/'.join([prepare_regex(split) for split in line[1:].split('/')]))
@@ -154,10 +159,20 @@ def parse_dropboxignore(dropboxignore: List[str]) -> Rules:
             regex.append(r'(^|(.*)\/)')
             regex.append(r'\/'.join([prepare_regex(split) for split in line.split('/')]))
             regex.append(r'(.*)')
-        
+
         getattr(rules, 'ignored' if not exclude else 'excluded').append(re.compile(r''.join(regex)))
-    
+
     return rules
+
+
+def test_if_ignored(path, rules):
+    for rule in rules.ignored:
+        if rule.match(path):
+            for erule in rules.excluded:
+                if erule.match(path):
+                    return False
+            return True
+    return False
 
 
 def build_initial_tree(dropbox_path: str, rules: Rules) -> IgnoreTree:
@@ -171,27 +186,17 @@ def build_initial_tree(dropbox_path: str, rules: Rules) -> IgnoreTree:
     :return: tree of ignored paths
     :rtype: [type]
     """
-    ignore_tree = IgnoreTree()
-
-    def test_if_ignored(path):
-        for rule in rules.ignored:
-            if rule.match(path):
-                for erule in rules.excluded:
-                    if erule.match(path):
-                        return False
-                return True
-        return False
+    ignore_tree = IgnoreTree(dropbox_path)
 
     def iterate_over_path(path):
-        print(path)
         for subpath_entry in os.scandir(path):
             subpath = subpath_entry.path
-            print(subpath, test_if_ignored(subpath))
-            if not subpath_entry.is_dir() or subpath_entry.name in ['.', '..']:
+            if not subpath_entry.is_dir():
                 continue
 
-            if test_if_ignored(subpath):
-                ignore_tree.add_ignored(path)
+            subrelpath = p.relpath(p.normpath(subpath), dropbox_path)
+            if test_if_ignored(subrelpath, rules):
+                ignore_tree.add_ignored(subrelpath)
             else:
                 iterate_over_path(subpath)
 
@@ -216,25 +221,19 @@ class EventHandler(pyinotify.ProcessEvent):
         :param event: Object of raised event
         :type event: pyinotify.Event
         """
-        
         relative_path = p.relpath(p.normpath(event.pathname), self.dropbox_path)
-        
-        def test_if_ignored(path):
-            for rule in self.rules.ignored:
-                if rule.match(path):
-                    for erule in self.rules.excluded:
-                        if erule.match(path):
-                            return False
-                    return True
-            return False
 
-        print(event, relative_path, test_if_ignored(relative_path)) 
         # Test if ignored
-        if test_if_ignored(relative_path):
+        if test_if_ignored(relative_path, self.rules):
             self.ignore_tree.add_ignored(relative_path)
 
 
-def main(dropbox_path: str) -> None:
+def main() -> None:
+    if len(sys.argv) != 2:
+        print('Wrong number of arguments')
+        sys.exit(RETURN_CODES.WRONG_NUMBER_OF_ARGS)
+    dropbox_path = sys.argv[1]
+
     # Check if dropbox path is a directory
     if not p.isdir(dropbox_path):
         print('Dropbox path is not a directory.')
@@ -269,21 +268,18 @@ def main(dropbox_path: str) -> None:
         sys.exit(RETURN_CODES.SCANNING_ERROR)
 
     # Watch directory
-    events = pyinotify.IN_CREATE | pyinotify.IN_MOVED_TO
+    events = pyinotify.IN_CREATE | pyinotify.IN_MOVED_TO | pyinotify.IN_MOVED_FROM
     wm = pyinotify.WatchManager()
     notifier = pyinotify.Notifier(wm, EventHandler(dropbox_path, rules, ignore_tree))
     wm.add_watch(dropbox_path, events, rec=True)
 
     try:
         print('Watching path')
-        notifier.loop(daemonize=False, pid_file='/tmp/dropbox_ignore.pid')
+        notifier.loop()
     except pyinotify.NotifierError as err:
         print(f'Cannot watch path: {err}')
         sys.exit(RETURN_CODES.CANNOT_WATCH_PATH)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print('Wrong number of arguments')
-        sys.exit(RETURN_CODES.WRONG_NUMBER_OF_ARGS)
-    main(sys.argv[1])
+    main()
