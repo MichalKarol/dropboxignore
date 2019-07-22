@@ -1,0 +1,6 @@
+.history
+__pycache__
+.*_cache
+htmlcov
+coverage.xml
+.coverage
