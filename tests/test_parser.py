@@ -23,7 +23,7 @@ def test_comment_line():
     assert len(rules.ignored) == 0
 
 
-def test_hash_starting_line(subtests):
+def test_hash_starting_line():
     # GIVEN
     pattern = '\\#test'
 
