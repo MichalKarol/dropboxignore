@@ -1,4 +1,4 @@
-from mock import patch, MagicMock
+from unittest.mock import patch, MagicMock
 from dropboxignore import EventHandler, Rules
 
 

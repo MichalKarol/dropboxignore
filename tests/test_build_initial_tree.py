@@ -1,4 +1,4 @@
-from mock import MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 from dropboxignore import build_initial_tree, Rules
 

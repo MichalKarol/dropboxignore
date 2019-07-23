@@ -1,4 +1,4 @@
-from mock import patch, MagicMock, PropertyMock
+from unittest.mock import patch, MagicMock, PropertyMock
 
 from dropboxignore import IgnoreTree
 
