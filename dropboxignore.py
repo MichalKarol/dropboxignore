@@ -230,7 +230,7 @@ class EventHandler(pyinotify.ProcessEvent):
 
 def main() -> None:
     if len(sys.argv) != 2:
-        print('Wrong number of arguments')
+        print('USAGE: dropboxignore $PATH_TO_DROPBOX_DIRECTORY')
         sys.exit(RETURN_CODES.WRONG_NUMBER_OF_ARGS)
     dropbox_path = sys.argv[1]
 
