@@ -55,6 +55,14 @@ jobs:
       python3 setup.py sdist bdist_wheel
     displayName: 'building'
 
+  - task: CopyFiles@2
+    inputs:
+      SourceFolder: './dist'
+      Contents: '**'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)/dist'
+      CleanTargetFolder: true
+      OverWrite: true
+
   - task: PublishBuildArtifacts@1
     displayName: 'Publish Artifact: dist'
     inputs:
