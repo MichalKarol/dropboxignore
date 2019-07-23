@@ -6,27 +6,57 @@
 trigger:
 - master
 
-pool:
-  vmImage: 'ubuntu-latest'
-strategy:
-  matrix:
-    Python36:
-      python.version: '3.6'
-    Python37:
-      python.version: '3.7'
+jobs:
+- job: LinuxTests
+  displayName: Linux tests
 
-steps:
-- task: UsePythonVersion@0
-  inputs:
-    versionSpec: '$(python.version)'
-  displayName: 'Use Python $(python.version)'
+  pool:
+    vmImage: 'ubuntu-latest'
+  strategy:
+    matrix:
+      Python36:
+        python.version: '3.6'
+      Python37:
+        python.version: '3.7'
 
-- script: |
-    python -m pip install --upgrade pip
-    pip install -r requirements.txt
-  displayName: 'Install dependencies'
+  steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '$(python.version)'
+    displayName: 'Use Python $(python.version)'
 
-- script: |
-    pip install pytest pytest-azurepipelines pytest-cov
-    pytest tests/ --cov dropboxignore --cov-report html
-  displayName: 'pytest'
+  - script: |
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
+    displayName: 'Install dependencies'
+
+  - script: |
+      pip install pytest pytest-azurepipelines pytest-cov
+      pytest tests/ --cov dropboxignore --cov-report html
+    displayName: 'pytest'
+
+- job: BuildPackage
+  displayName: 'Build Package'
+  dependsOn: 
+  - LinuxTests
+
+  pool:
+    vmImage: 'ubuntu-latest'
+  
+  steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.x'
+      addToPath: true
+      architecture: 'x64'
+
+  - script: |
+      python3 -m pip install --user --upgrade setuptools wheel
+      python3 setup.py sdist bdist_wheel
+    displayName: 'building'
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Artifact: dist'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)/dist'
+      ArtifactName: dist
