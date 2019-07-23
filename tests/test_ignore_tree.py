@@ -9,7 +9,7 @@ def test_add_ignored_non_existing():
     path = 'a/b'
 
     # WHEN
-    it = IgnoreTree()
+    it = IgnoreTree('')
     it.add_ignored(path)
 
     # THEN
@@ -23,7 +23,7 @@ def test_add_ignored_existing_parent():
     path = 'a/b'
 
     # WHEN
-    it = IgnoreTree()
+    it = IgnoreTree('')
     it.add_ignored(parent)
     it.add_ignored(path)
 
@@ -35,7 +35,7 @@ def test_add_ignored_existing_parent():
 def test_add_ignored_existing_path():
     # GIVEN
     path = 'a/b'
-    it = IgnoreTree()
+    it = IgnoreTree('')
     it.add_ignored(path)
     node_mock = MagicMock()
     prop_mock = PropertyMock(return_value=True)
