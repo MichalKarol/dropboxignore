@@ -15,7 +15,7 @@ if p.isfile(requirement_path):
 
 setuptools.setup(
     name='dropboxignore',
-    version='0.1',
+    version='0.2.0',
     scripts=['dropboxignore.py'],
     author='Michał Karol',
     author_email='michal.p.karol@gmail.com',

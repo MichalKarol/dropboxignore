@@ -1,5 +1,6 @@
 # dropboxignore
-Tool allowing for watching sync directory and setting Dropbox to ignore paths using .dropboxignore
+Python implementation of Dropbox equivalent of .gitignore: .dropboxignore.
+At the beginning tool will exclude using Selective Sync in Dropbox all directories matching rules stored in .dropboxignore. Later it will monitor the Dropbox's directory using inotify and exclude them before Dropbox sync them.
 
 ![Azure DevOps builds](https://img.shields.io/azure-devops/build/michalpkarol/dropboxignore/1.svg?style=flat-square)
 ![Azure DevOps tests (compact)](https://img.shields.io/azure-devops/tests/michalpkarol/dropboxignore/1.svg?compact_message&style=flat-square)

@@ -28,7 +28,6 @@ dropboxignore
 @contact: michal.p.karol@gmail.com
 """
 
-from collections import defaultdict
 from typing import List, Pattern, NamedTuple
 
 import os
@@ -53,34 +52,22 @@ class ParsingException(Exception):
     pass
 
 
-class Tree(defaultdict):
-    def __init__(self, ignored=False):
-        super(Tree, self).__init__(Tree)
-        self.ignored = ignored
-
-
-class IgnoreTree(object):
-    def __init__(self, dropbox_path, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.dropbox_path = dropbox_path
-        self.tree = Tree()
-
-    def add_ignored(self, path):
-        path_elements = path.split(p.sep)
-        current_node = self.tree
-        for path_element in path_elements:
-            # Key exists
-            if path_element in current_node:
-                if current_node[path_element].ignored:
-                    # Already ignored
-                    return
-            current_node = current_node[path_element]
-        current_node.ignored = True
-        subprocess.call(f'dropbox exclude add {self.dropbox_path}{p.sep}{path}', shell=True)
-
-
 # Typedefing
 Rules = NamedTuple('Rules', [('ignored', List[Pattern[str]]), ('excluded', List[Pattern[str]])])
+
+
+def dropbox_exclude(ignore_path: str, dropbox_path: str):
+    already_excluded = subprocess.check_output(['dropbox', 'exclude', 'list'], cwd=dropbox_path).decode("utf-8")
+    already_excluded_list = already_excluded.split('\n')[1:-1]
+
+    for already_exclued_path in already_excluded_list:
+        if ignore_path.lower() == already_exclued_path or ignore_path.lower().startswith(f'{already_exclued_path}{p.sep}'):
+            print(f'Path {ignore_path} already excluded by {already_exclued_path}')
+            return
+
+    absolute_ignore_path = p.join(dropbox_path, ignore_path)
+    print(f'Path {absolute_ignore_path} excluded')
+    subprocess.call(f'dropbox exclude add \'{absolute_ignore_path}\'', shell=True)
 
 
 def parse_dropboxignore(dropboxignore: List[str]) -> Rules:
@@ -175,9 +162,8 @@ def test_if_ignored(path, rules):
     return False
 
 
-def build_initial_tree(dropbox_path: str, rules: Rules) -> IgnoreTree:
-    """Build initial ignore tree, therefore allowing for ignoring paths by not yet applied rules
-       and reducing needed calls when eg. created file is already in ignored path
+def initial_excludes(dropbox_path: str, rules: Rules) -> None:
+    """First run to exclude all paths matching rules
 
     :param dropbox_path: path synchronized by dropbox
     :type dropbox_path: str
@@ -186,7 +172,6 @@ def build_initial_tree(dropbox_path: str, rules: Rules) -> IgnoreTree:
     :return: tree of ignored paths
     :rtype: [type]
     """
-    ignore_tree = IgnoreTree(dropbox_path)
 
     def iterate_over_path(path):
         for subpath_entry in os.scandir(path):
@@ -196,21 +181,19 @@ def build_initial_tree(dropbox_path: str, rules: Rules) -> IgnoreTree:
 
             subrelpath = p.relpath(p.normpath(subpath), dropbox_path)
             if test_if_ignored(subrelpath, rules):
-                ignore_tree.add_ignored(subrelpath)
+                dropbox_exclude(subrelpath, dropbox_path)
             else:
                 iterate_over_path(subpath)
 
     iterate_over_path(dropbox_path)
-    return ignore_tree
 
 
 class EventHandler(pyinotify.ProcessEvent):
     """Class with implementation of method checking ignored paths"""
 
-    def __init__(self, dropbox_path: str, rules: Rules, ignore_tree: IgnoreTree, pevent=None, **kargs):
+    def __init__(self, dropbox_path: str, rules: Rules, pevent=None, **kargs):
         self.dropbox_path = dropbox_path
         self.rules = rules
-        self.ignore_tree = ignore_tree
         return super().__init__(pevent=pevent, **kargs)
 
     def process_default(self, event: pyinotify.Event):
@@ -225,7 +208,7 @@ class EventHandler(pyinotify.ProcessEvent):
 
         # Test if ignored
         if test_if_ignored(relative_path, self.rules):
-            self.ignore_tree.add_ignored(relative_path)
+            dropbox_exclude(relative_path, self.dropbox_path)
 
 
 def main() -> None:
@@ -262,7 +245,7 @@ def main() -> None:
     # Initial scan of directory and building ignore tree
     try:
         pass
-        ignore_tree = build_initial_tree(dropbox_path, rules)
+        initial_excludes(dropbox_path, rules)
     except Exception as err:
         print(f'Exception during scanning path: {err}')
         sys.exit(RETURN_CODES.SCANNING_ERROR)
@@ -270,7 +253,7 @@ def main() -> None:
     # Watch directory
     events = pyinotify.IN_CREATE | pyinotify.IN_MOVED_TO | pyinotify.IN_MOVED_FROM
     wm = pyinotify.WatchManager()
-    notifier = pyinotify.Notifier(wm, EventHandler(dropbox_path, rules, ignore_tree))
+    notifier = pyinotify.Notifier(wm, EventHandler(dropbox_path, rules))
     wm.add_watch(dropbox_path, events, rec=True)
 
     try:

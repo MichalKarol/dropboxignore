@@ -3,28 +3,26 @@ from dropboxignore import EventHandler, Rules
 
 
 @patch('dropboxignore.test_if_ignored', lambda *_, **__: True)
-def test_event_handler_positive():
+@patch('dropboxignore.dropbox_exclude')
+def test_event_handler_positive(dropbox_exclude_mock):
     # GIVEN
-    ignore_tree_mock = MagicMock()
-    ignore_tree_mock.add_ignored.side_effect = None
 
     # WHEN
-    ev = EventHandler('', Rules([], []), ignore_tree_mock)
+    ev = EventHandler('', Rules([], []))
     ev.process_default(MagicMock(pathname=''))
 
     # THEN
-    ignore_tree_mock.add_ignored.assert_called_once()
+    dropbox_exclude_mock.assert_called_once()
 
 
 @patch('dropboxignore.test_if_ignored', lambda *_, **__: False)
-def test_event_handler_negative():
+@patch('dropboxignore.dropbox_exclude')
+def test_event_handler_negative(dropbox_exclude_mock):
     # GIVEN
-    ignore_tree_mock = MagicMock()
-    ignore_tree_mock.add_ignored.side_effect = None
 
     # WHEN
-    ev = EventHandler('', Rules([], []), ignore_tree_mock)
+    ev = EventHandler('', Rules([], []))
     ev.process_default(MagicMock(pathname=''))
 
     # THEN
-    assert not ignore_tree_mock.called
+    assert not dropbox_exclude_mock.called

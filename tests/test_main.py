@@ -88,11 +88,11 @@ def test_main_parse_error(main_mock, parse_dropboxignore_mock):
 @patch('os.path.exists', lambda *_, **__: True)
 @patch("builtins.open", mock_open(read_data=''))
 @patch('dropboxignore.parse_dropboxignore', lambda *_, **__: None)
-@patch('dropboxignore.build_initial_tree')
+@patch('dropboxignore.initial_excludes')
 @patch('dropboxignore.main')
-def test_main_scanning_directory_error(main_mock, build_initial_tree_mock):
+def test_main_scanning_directory_error(main_mock, initial_excludes_mock):
     # GIVEN
-    build_initial_tree_mock.side_effect = Exception()
+    initial_excludes_mock.side_effect = Exception()
 
     # WHEN
     with pytest.raises(SystemExit) as exit_exception:
@@ -107,7 +107,7 @@ def test_main_scanning_directory_error(main_mock, build_initial_tree_mock):
 @patch('os.path.exists', lambda *_, **__: True)
 @patch("builtins.open", mock_open(read_data=''))
 @patch('dropboxignore.parse_dropboxignore', lambda *_, **__: None)
-@patch('dropboxignore.build_initial_tree', lambda *_, **__: None)
+@patch('dropboxignore.initial_excludes', lambda *_, **__: None)
 @patch('pyinotify.Notifier')
 @patch('dropboxignore.main')
 def test_main_watch_error(main_mock, notifier_mock):
