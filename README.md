@@ -7,5 +7,23 @@ At the beginning tool will exclude using Selective Sync in Dropbox all directori
 ![Azure DevOps coverage](https://img.shields.io/azure-devops/coverage/michalpkarol/dropboxignore/1.svg?style=flat-square)
 
 ## Usage
-1) Create .dropboxignore file
-2) Run `dropboxignore $PATH_TO_DROPBOX_DIRECTORY`
+`$PATH_TO_DROPBOX_DIRECTORY` is Dropbox root directory
+1) Create .dropboxignore file in `$PATH_TO_DROPBOX_DIRECTORY`
+2) Run `dropboxignore $PATH_TO_DROPBOX_DIRECTORY` and do not close your termial (needed for directory monitoring)
+
+## Example .dropboxignore
+Example .dropboxignore for Dropbox directory inside which JS/TS and Python projects are developed.
+```
+node_modules
+__pycache__
+.mypy_cache
+.pytest_cache
+.history
+htmlcov
+```
+---
+.dropboxignore works for whole Dropbox root directory, but it could be used for more selective exclusion eg.
+```
+some_project/node_modules
+```
+where only in `some_project` directory `node_modules` is excluded and for the rest of the projects `node_modules` are synced.
